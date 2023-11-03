@@ -62,7 +62,9 @@ export const ContractUI = ({ contractName, className = "" }: ContractUIProps) =>
   if (!deployedContractData) {
     return (
       <p className="text-3xl mt-14">
-        {`No contract found by the name of "${contractName}" on chain "${configuredNetwork.name}"!`}
+        {`No contract found by the name of "${contractName}" on chain "${
+          configuredNetwork.name == "Hardhat" ? "Anvil" : configuredNetwork.name
+        }"!`}
       </p>
     );
   }
@@ -85,7 +87,9 @@ export const ContractUI = ({ contractName, className = "" }: ContractUIProps) =>
             {configuredNetwork && (
               <p className="my-0 text-sm">
                 <span className="font-bold">Network</span>:{" "}
-                <span style={{ color: networkColor }}>{configuredNetwork.name}</span>
+                <span style={{ color: networkColor }}>
+                  {configuredNetwork.name == "Hardhat" ? "Anvil" : configuredNetwork.name}
+                </span>
               </p>
             )}
           </div>

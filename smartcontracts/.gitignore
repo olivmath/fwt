@@ -4,7 +4,7 @@ artifacts/
 
 # Ignores development broadcast logs
 
-!/broadcast/*/31337/run-latest.json
+/broadcast/*/31337/
 /broadcast/**/dry-run/
 
 # Docs
