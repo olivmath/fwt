@@ -1,0 +1,7 @@
+FROM ghcr.io/foundry-rs/foundry
+
+WORKDIR /defi
+COPY . .
+
+RUN forge b --skip test
+CMD ["forge script scripts/deploy.e2e.s.sol:DeployE2E -f http://anvil:8545 --broadcast --verbosity"]
