@@ -1,1 +1,1 @@
-# FullStack Web3 Template
+# FullStack Web3 Foundry
