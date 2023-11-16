@@ -24,8 +24,7 @@ CHAIN_ID = 31337
 CONTRACT_SCRIPT_NAME = "Deploy.s.sol"
 TRANSACTIONS_PATH = f"broadcast/{CONTRACT_SCRIPT_NAME}/{CHAIN_ID}/run-latest.json"
 TARGET_DIR = "../ui/generated/deployedContracts.ts"
-TOKENS = ["USDT", "USDC"]
-DIAMOND_ADDRESS = ""
+
 
 
 def abi_path(name) -> str:
