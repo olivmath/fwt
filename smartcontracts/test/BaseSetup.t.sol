@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.18;
 
 import {Counter} from "../src/Counter.sol";
 import {Utils} from "./Utils.t.sol";
@@ -7,29 +7,35 @@ import {Utils} from "./Utils.t.sol";
 contract BaseSetup is Utils {
     Counter counter;
 
-    address[] users;
-    address deployer;
+    address[] _users;
+    address controller;
     address alice;
     address bob;
-
-    function createMockUsers(address[] memory myUsers) private {
-        deployer = myUsers[2];
-        alice = myUsers[0];
-        bob = myUsers[1];
-
-        vm.label(deployer, "deployer (dev)");
-        vm.label(alice, "alice");
-        vm.label(bob, "bob");
-    }
+    address eve;
+    address trent;
+    address zero;
 
     function setUp() public virtual {
-        Utils utils = new Utils();
-        users = utils.createUsers(3);
+        _users = createUsers(5);
 
-        createMockUsers(users);
+        controller = _users[0];
+        alice = _users[1];
+        bob = _users[2];
+        eve = _users[3];
+        trent = _users[4];
+        zero = address(0x0);
 
-        vm.startPrank(deployer);
+        vm.label(controller, "CONTROLLER");
+        vm.label(alice, "ALICE");
+        vm.label(bob, "BOB");
+        vm.label(eve, "EVE");
+        vm.label(trent, "TRENT");
+        vm.label(zero, "ZERO");
+
+        vm.startPrank(controller);
         counter = new Counter();
         vm.stopPrank();
     }
+
+    function test_basesetup_just_for_pass_in_converage() public {}
 }

@@ -5,23 +5,18 @@ import {console2} from "forge-std/console2.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-//common utilities for forge tests
 contract Utils is Test {
-    bytes32 private nextUser = keccak256(abi.encodePacked("user address"));
+    string mnemonic =
+        "test test test test test test test test test test test junk";
 
-    function getNextUserAddress() private returns (address payable) {
-        //bytes32 to address conversion
-        address payable user = payable(address(uint160(uint256(nextUser))));
-        nextUser = keccak256(abi.encodePacked(nextUser));
-        return user;
-    }
-
-    function createUsers(uint256 userNum) external returns (address payable[] memory) {
+    function createUsers(
+        uint32 userNum
+    ) public returns (address payable[] memory) {
         address payable[] memory users = new address payable[](userNum);
-        for (uint256 i = 0; i < userNum; i++) {
-            address payable user = getNextUserAddress();
+        for (uint32 i = 0; i < userNum; i++) {
+            (address user, ) = deriveRememberKey(mnemonic, i);
             vm.deal(user, 10000 ether);
-            users[i] = user;
+            users[i] = payable(user);
         }
         return users;
     }
@@ -44,4 +39,10 @@ contract Utils is Test {
         }
         return string(buffer);
     }
+
+    function bytes2uint(bytes32 b) public pure returns (uint256 result) {
+        result = uint256(b);
+    }
+
+    function test_utils_just_for_pass_in_converage() public {}
 }
