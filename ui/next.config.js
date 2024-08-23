@@ -2,6 +2,7 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "standalone",
   reactStrictMode: true,
   typescript: {
     ignoreBuildErrors: process.env.NEXT_PUBLIC_IGNORE_BUILD_ERROR === "true",
