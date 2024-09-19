@@ -32,7 +32,8 @@
     "use-debounce": "10.0.3",
     "usehooks-ts": "3.1.0",
     "wagmi": "2.12.12",
-    "zustand": "^4.5.5"
+    "zustand": "^4.5.5",
+    "dompurify": "^3.1.6"
   },
   "devDependencies": {
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",

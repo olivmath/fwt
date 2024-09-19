@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { ethers } from "ethers";
 import { localhost } from "wagmi/chains";
 import { getLocalProvider } from "~~/utils/scaffold-eth";
+import DOMPurify from "dompurify";
 
 const provider = getLocalProvider(localhost);
 export const SearchBar = () => {
@@ -11,11 +12,12 @@ export const SearchBar = () => {
 
   const handleSearch = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (ethers.utils.isHexString(searchInput)) {
+    const sanitizedInput = DOMPurify.sanitize(searchInput);
+    if (ethers.utils.isHexString(sanitizedInput)) {
       try {
-        const tx = await provider?.getTransaction(searchInput);
+        const tx = await provider?.getTransaction(sanitizedInput);
         if (tx) {
-          router.push(`/blockexplorer/transaction/${searchInput}`);
+          router.push(`/blockexplorer/transaction/${sanitizedInput}`);
           return;
         }
       } catch (error) {
@@ -23,8 +25,8 @@ export const SearchBar = () => {
       }
     }
 
-    if (ethers.utils.isAddress(searchInput)) {
-      router.push(`/blockexplorer/address/${searchInput}`);
+    if (ethers.utils.isAddress(sanitizedInput)) {
+      router.push(`/blockexplorer/address/${sanitizedInput}`);
       return;
     }
   };
