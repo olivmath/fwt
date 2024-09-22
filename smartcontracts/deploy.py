@@ -1,6 +1,7 @@
 """
 Automation for update debug section in front-end
 """
+
 from dataclasses import dataclass, field
 from json import dumps, load
 from typing import List
@@ -23,8 +24,7 @@ class Contract:
 CHAIN_ID = 31337
 CONTRACT_SCRIPT_NAME = "deploy.local.s.sol"
 TRANSACTIONS_PATH = f"broadcast/{CONTRACT_SCRIPT_NAME}/{CHAIN_ID}/run-latest.json"
-TARGET_DIR = "../ui/generated/deployedContracts.ts"
-
+TARGET_DIR = "../ui/contracts/deployedContracts.ts"
 
 
 def abi_path(name) -> str:
@@ -44,19 +44,21 @@ with open(TRANSACTIONS_PATH) as deployed_contracts:
                 contracts.append(Contract(name, address, abi))
 
 
-json_config = {
-    CHAIN_ID: [{"name": "localhost", "chainId": str(CHAIN_ID), "contracts": {}}]
-}
+typescript_content = f"""
+import {{ GenericContractsDeclaration }} from "~~/utils/scaffold-eth/contract";
 
+const deployedContracts = {{
+    {CHAIN_ID}: {dumps({
+        contract.name: {
+            "address": contract.address,
+            "abi": contract.abi,
+        }
+        for contract in contracts
+    })}
+}} as const;
 
-for contract in contracts:
-    json_config[CHAIN_ID][0]["contracts"][contract.name] = {
-        "address": contract.address,
-        "abi": contract.abi,
-    }
-
-
-typescript_content = f"const deployedContracts = {dumps(json_config)} as const; \n\n export default deployedContracts"
+export default deployedContracts satisfies GenericContractsDeclaration;
+"""
 
 
 with open(TARGET_DIR, "w") as ts_file:
