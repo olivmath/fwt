@@ -17,7 +17,6 @@ contract Counter {
         number++;
     }
 
-
     function getError(uint256 yourAmount) public pure returns (string memory) {
         revert CustomError("An error occurred", yourAmount);
     }
