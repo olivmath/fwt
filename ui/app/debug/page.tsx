@@ -1,10 +1,10 @@
 import { DebugContracts } from "./_components/DebugContracts";
 import type { NextPage } from "next";
-import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
+import { getMetadata } from "~~/utils/fwt/getMetadata";
 
 export const metadata = getMetadata({
   title: "Debug Contracts",
-  description: "Debug your deployed 🏗 Scaffold-ETH 2 contracts in an easy way",
+  description: "Debug your deployed 🏗 Fullstack Web3 Template contracts in an easy way",
 });
 
 const Debug: NextPage = () => {

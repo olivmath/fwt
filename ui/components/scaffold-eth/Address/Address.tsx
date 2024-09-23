@@ -7,7 +7,7 @@ import { normalize } from "viem/ens";
 import { useEnsAvatar, useEnsName } from "wagmi";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
-import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
+import { getBlockExplorerAddressLink } from "~~/utils/fwt";
 
 const textSizeMap = {
   "3xs": "text-[10px]",

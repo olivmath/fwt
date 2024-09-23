@@ -1,6 +1,6 @@
 import { Address } from "viem";
 import { useContractLogs } from "~~/hooks/scaffold-eth";
-import { replacer } from "~~/utils/scaffold-eth/common";
+import { replacer } from "~~/utils/fwt/common";
 
 export const AddressLogsTab = ({ address }: { address: Address }) => {
   const contractLogs = useContractLogs(address);

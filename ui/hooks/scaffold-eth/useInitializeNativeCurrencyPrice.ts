@@ -3,7 +3,7 @@ import { useTargetNetwork } from "./useTargetNetwork";
 import { useInterval } from "usehooks-ts";
 import scaffoldConfig from "~~/scaffold.config";
 import { useGlobalState } from "~~/services/store/store";
-import { fetchPriceFromUniswap } from "~~/utils/scaffold-eth";
+import { fetchPriceFromUniswap } from "~~/utils/fwt";
 
 const enablePolling = false;
 

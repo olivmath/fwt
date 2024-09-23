@@ -1,6 +1,6 @@
 import { useTargetNetwork } from "./useTargetNetwork";
 import { useTheme } from "next-themes";
-import { ChainWithAttributes } from "~~/utils/scaffold-eth";
+import { ChainWithAttributes } from "~~/utils/fwt";
 
 export const DEFAULT_NETWORK_COLOR: [string, string] = ["#666666", "#bbbbbb"];
 

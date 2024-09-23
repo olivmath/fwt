@@ -6,13 +6,13 @@ import { Config, UseWriteContractParameters, useAccount, useWriteContract } from
 import { WriteContractErrorType, WriteContractReturnType } from "wagmi/actions";
 import { WriteContractVariables } from "wagmi/query";
 import { useDeployedContractInfo, useTransactor } from "~~/hooks/scaffold-eth";
-import { notification } from "~~/utils/scaffold-eth";
+import { notification } from "~~/utils/fwt";
 import {
   ContractAbi,
   ContractName,
   ScaffoldWriteContractOptions,
   ScaffoldWriteContractVariables,
-} from "~~/utils/scaffold-eth/contract";
+} from "~~/utils/fwt/contract";
 
 /**
  * Wrapper around wagmi's useWriteContract hook which automatically loads (by name) the contract ABI and address from

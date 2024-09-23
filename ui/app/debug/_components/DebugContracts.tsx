@@ -4,8 +4,8 @@ import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { BarsArrowUpIcon } from "@heroicons/react/20/solid";
 import { ContractUI } from "~~/app/debug/_components/contract";
-import { ContractName, GenericContract } from "~~/utils/scaffold-eth/contract";
-import { useAllContracts } from "~~/utils/scaffold-eth/contractsData";
+import { ContractName, GenericContract } from "~~/utils/fwt/contract";
+import { useAllContracts } from "~~/utils/fwt/contractsData";
 
 const selectedContractStorageKey = "scaffoldEth2.selectedContract";
 

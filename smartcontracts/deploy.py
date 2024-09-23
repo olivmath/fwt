@@ -45,7 +45,7 @@ with open(TRANSACTIONS_PATH) as deployed_contracts:
 
 
 typescript_content = f"""
-import {{ GenericContractsDeclaration }} from "~~/utils/scaffold-eth/contract";
+import {{ GenericContractsDeclaration }} from "~~/utils/fwt/contract";
 
 const deployedContracts = {{
     {CHAIN_ID}: {dumps({

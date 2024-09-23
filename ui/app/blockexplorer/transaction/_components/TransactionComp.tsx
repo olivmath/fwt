@@ -7,8 +7,8 @@ import { hardhat } from "viem/chains";
 import { usePublicClient } from "wagmi";
 import { Address } from "~~/components/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
-import { decodeTransactionData, getFunctionDetails } from "~~/utils/scaffold-eth";
-import { replacer } from "~~/utils/scaffold-eth/common";
+import { decodeTransactionData, getFunctionDetails } from "~~/utils/fwt";
+import { replacer } from "~~/utils/fwt/common";
 
 const TransactionComp = ({ txHash }: { txHash: Hash }) => {
   const client = usePublicClient({ chainId: hardhat.id });
