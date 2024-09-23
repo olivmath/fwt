@@ -6,12 +6,42 @@ import { BarsArrowUpIcon } from "@heroicons/react/20/solid";
 import { ContractUI } from "~~/app/debug/_components/contract";
 import { ContractName, GenericContract } from "~~/utils/fwt/contract";
 import { useAllContracts } from "~~/utils/fwt/contractsData";
+import { useScaffoldWatchContractEvent } from "~~/hooks/scaffold-eth/useScaffoldWatchContractEvent";
+import { notification } from "~~/utils/fwt/notification";
 
 const selectedContractStorageKey = "scaffoldEth2.selectedContract";
 
 export function DebugContracts() {
   const contractsData = useAllContracts();
   const contractNames = useMemo(() => Object.keys(contractsData) as ContractName[], [contractsData]);
+
+  contractNames.forEach(contractName => {
+    const contract = contractsData[contractName];
+    if (contract && contract.abi) {
+      contract.abi.forEach(item => {
+        if (item.type === "event") {
+          useScaffoldWatchContractEvent({
+            contractName: contractName,
+            eventName: item.name,
+            onLogs: logs => {
+              logs.forEach(log => {
+                const args = Object.entries(log.args)
+                  .filter(([key]) => isNaN(Number(key)))
+                  .map(([key, value]) => `${key}: ${value}`)
+                  .join("\n");
+
+                notification.info(
+                  `Event "${item.name}" triggered on ${contractName}:
+                  ${args}`,
+                  { duration: 6000 },
+                );
+              });
+            },
+          });
+        }
+      });
+    }
+  });
 
   const [selectedContract, setSelectedContract] = useLocalStorage<ContractName>(
     selectedContractStorageKey,
