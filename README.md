@@ -2,6 +2,8 @@
 
 ## QuickStart
 
+![](./assets/intro.mp4)
+
 **You need run 3 app, using 3 terminals**:
 
 1. Frontend

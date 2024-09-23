@@ -26,7 +26,7 @@ contract Counter {
         emit YouCall(msg.sender, msg.value);
     }
 
-    function youETHBalance() public {
-        emit YourBalance(msg.sender, address(this).balance);
+    function yourETHBalance() public {
+        emit YourBalance(msg.sender, msg.sender.balance);
     }
 }
