@@ -1,4 +1,4 @@
-# Fullstack Web3 Template v2.3.0
+# Fullstack Web3 Template v2.3.1
 
 ## QuickStart
 
