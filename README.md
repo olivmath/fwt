@@ -1,8 +1,8 @@
 # Fullstack Web3 Template v2.3.2
 
-## QuickStart
+https://github.com/user-attachments/assets/d49b05ed-da7c-47df-9665-dedf0c2f25a9
 
-![](./assets/intro.mp4)
+## QuickStart
 
 **You need run 3 app, using 3 terminals**:
 
