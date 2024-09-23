@@ -1,6 +1,7 @@
-import { TransactionReceipt } from "@ethersproject/abstract-provider";
+import { MutateOptions } from "@tanstack/react-query";
 import {
   Abi,
+  AbiParameter,
   AbiParameterToPrimitiveType,
   AbiParametersToPrimitiveTypes,
   ExtractAbiEvent,
@@ -8,33 +9,81 @@ import {
   ExtractAbiFunction,
 } from "abitype";
 import type { ExtractAbiFunctionNames } from "abitype";
-import { UseContractEventConfig, UseContractReadConfig, UseContractWriteConfig } from "wagmi";
-import contractsData from "~~/generated/deployedContracts";
+import type { Simplify } from "type-fest";
+import type { MergeDeepRecord } from "type-fest/source/merge-deep";
+import {
+  Address,
+  Block,
+  GetEventArgs,
+  GetTransactionReceiptReturnType,
+  GetTransactionReturnType,
+  Log,
+  TransactionReceipt,
+  WriteContractErrorType,
+} from "viem";
+import { Config, UseReadContractParameters, UseWatchContractEventParameters } from "wagmi";
+import { WriteContractParameters, WriteContractReturnType } from "wagmi/actions";
+import { WriteContractVariables } from "wagmi/query";
+import deployedContractsData from "~~/contracts/deployedContracts";
+import externalContractsData from "~~/contracts/externalContracts";
 import scaffoldConfig from "~~/scaffold.config";
 
+type AddExternalFlag<T> = {
+  [ChainId in keyof T]: {
+    [ContractName in keyof T[ChainId]]: T[ChainId][ContractName] & { external?: true };
+  };
+};
+
+const deepMergeContracts = <L extends Record<PropertyKey, any>, E extends Record<PropertyKey, any>>(
+  local: L,
+  external: E,
+) => {
+  const result: Record<PropertyKey, any> = {};
+  const allKeys = Array.from(new Set([...Object.keys(external), ...Object.keys(local)]));
+  for (const key of allKeys) {
+    if (!external[key]) {
+      result[key] = local[key];
+      continue;
+    }
+    const amendedExternal = Object.fromEntries(
+      Object.entries(external[key] as Record<string, Record<string, unknown>>).map(([contractName, declaration]) => [
+        contractName,
+        { ...declaration, external: true },
+      ]),
+    );
+    result[key] = { ...local[key], ...amendedExternal };
+  }
+  return result as MergeDeepRecord<AddExternalFlag<L>, AddExternalFlag<E>, { arrayMergeMode: "replace" }>;
+};
+
+const contractsData = deepMergeContracts(deployedContractsData, externalContractsData);
+
+export type InheritedFunctions = { readonly [key: string]: string };
+
+export type GenericContract = {
+  address: Address;
+  abi: Abi;
+  inheritedFunctions?: InheritedFunctions;
+  external?: true;
+};
+
 export type GenericContractsDeclaration = {
-  [key: number]: readonly {
-    name: string;
-    chainId: string;
-    contracts: {
-      [key: string]: {
-        address: string;
-        abi: Abi;
-      };
-    };
-  }[];
+  [chainId: number]: {
+    [contractName: string]: GenericContract;
+  };
 };
 
 export const contracts = contractsData as GenericContractsDeclaration | null;
 
-type IsContractsFileMissing<TYes, TNo> = typeof contractsData extends null ? TYes : TNo;
-type ContractsDeclaration = IsContractsFileMissing<GenericContractsDeclaration, typeof contractsData>;
+type ConfiguredChainId = (typeof scaffoldConfig)["targetNetworks"][0]["id"];
 
-export type Chain = keyof ContractsDeclaration;
+type IsContractDeclarationMissing<TYes, TNo> = typeof contractsData extends { [key in ConfiguredChainId]: any }
+  ? TNo
+  : TYes;
 
-type SelectedChainId = IsContractsFileMissing<number, (typeof scaffoldConfig)["targetNetwork"]["id"]>;
+type ContractsDeclaration = IsContractDeclarationMissing<GenericContractsDeclaration, typeof contractsData>;
 
-type Contracts = ContractsDeclaration[SelectedChainId][0]["contracts"];
+type Contracts = ContractsDeclaration[ConfiguredChainId];
 
 export type ContractName = keyof Contracts;
 
@@ -58,20 +107,17 @@ export type AbiFunctionOutputs<TAbi extends Abi, TFunctionName extends string> =
   TFunctionName
 >["outputs"];
 
-export type AbiFunctionReturnType<TAbi extends Abi, TFunctionName extends string> = IsContractsFileMissing<
+export type AbiFunctionReturnType<TAbi extends Abi, TFunctionName extends string> = IsContractDeclarationMissing<
   any,
-  AbiParametersToPrimitiveTypes<AbiFunctionOutputs<TAbi, TFunctionName>>[0]
+  AbiParametersToPrimitiveTypes<AbiFunctionOutputs<TAbi, TFunctionName>> extends readonly [any]
+    ? AbiParametersToPrimitiveTypes<AbiFunctionOutputs<TAbi, TFunctionName>>[0]
+    : AbiParametersToPrimitiveTypes<AbiFunctionOutputs<TAbi, TFunctionName>>
 >;
 
 export type AbiEventInputs<TAbi extends Abi, TEventName extends ExtractAbiEventNames<TAbi>> = ExtractAbiEvent<
   TAbi,
   TEventName
 >["inputs"];
-
-export type AbiEventArgs<
-  TAbi extends Abi,
-  TEventName extends ExtractAbiEventNames<TAbi>,
-> = AbiParametersToPrimitiveTypes<AbiEventInputs<TAbi, TEventName>>;
 
 export enum ContractCodeStatus {
   "LOADING",
@@ -80,28 +126,18 @@ export enum ContractCodeStatus {
 }
 
 type AbiStateMutability = "pure" | "view" | "nonpayable" | "payable";
-
-export type FunctionNamesWithoutInputs<
-  TAbi extends Abi,
-  TAbiStateMutibility extends AbiStateMutability = AbiStateMutability,
-> = Extract<
-  TAbi[number],
-  {
-    type: "function";
-    stateMutability: TAbiStateMutibility;
-    inputs: readonly [];
-  }
->["name"];
+export type ReadAbiStateMutability = "view" | "pure";
+export type WriteAbiStateMutability = "nonpayable" | "payable";
 
 export type FunctionNamesWithInputs<
-  TAbi extends Abi,
-  TAbiStateMutibility extends AbiStateMutability = AbiStateMutability,
+  TContractName extends ContractName,
+  TAbiStateMutability extends AbiStateMutability = AbiStateMutability,
 > = Exclude<
   Extract<
-    TAbi[number],
+    ContractAbi<TContractName>[number],
     {
       type: "function";
-      stateMutability: TAbiStateMutibility;
+      stateMutability: TAbiStateMutability;
     }
   >,
   {
@@ -109,27 +145,21 @@ export type FunctionNamesWithInputs<
   }
 >["name"];
 
-type ReadAbiStateMutability = "view" | "pure";
-type WriteAbiStateMutability = "nonpayable" | "payable";
+type Expand<T> = T extends object ? (T extends infer O ? { [K in keyof O]: O[K] } : never) : T;
 
-type RestConfigParam<TAbiStateMutability extends AbiStateMutability> = Partial<
-  Omit<
-    TAbiStateMutability extends ReadAbiStateMutability
-      ? UseContractReadConfig
-      : UseContractWriteConfig<"recklesslyUnprepared">,
-    "chainId" | "abi" | "address" | "functionName" | "args"
-  >
->;
+type UnionToIntersection<U> = Expand<(U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never>;
 
-type OptionalTupple<T> = T extends readonly [infer H, ...infer R] ? readonly [H | undefined, ...OptionalTupple<R>] : T;
+type OptionalTuple<T> = T extends readonly [infer H, ...infer R] ? readonly [H | undefined, ...OptionalTuple<R>] : T;
 
 type UseScaffoldArgsParam<
   TContractName extends ContractName,
-  TAbiStateMutability extends AbiStateMutability,
-  TFunctionName extends ExtractAbiFunctionNames<ContractAbi<TContractName>, TAbiStateMutability>,
-> = TFunctionName extends FunctionNamesWithInputs<ContractAbi<TContractName>, TAbiStateMutability>
+  TFunctionName extends ExtractAbiFunctionNames<ContractAbi<TContractName>>,
+> = TFunctionName extends FunctionNamesWithInputs<TContractName>
   ? {
-      args: OptionalTupple<AbiFunctionArguments<ContractAbi<TContractName>, TFunctionName>>;
+      args: OptionalTuple<UnionToIntersection<AbiFunctionArguments<ContractAbi<TContractName>, TFunctionName>>>;
+      value?: ExtractAbiFunction<ContractAbi<TContractName>, TFunctionName>["stateMutability"] extends "payable"
+        ? bigint | undefined
+        : undefined;
     }
   : {
       args?: never;
@@ -140,42 +170,77 @@ export type UseScaffoldReadConfig<
   TFunctionName extends ExtractAbiFunctionNames<ContractAbi<TContractName>, ReadAbiStateMutability>,
 > = {
   contractName: TContractName;
-} & IsContractsFileMissing<
-  Partial<UseContractReadConfig>,
+  watch?: boolean;
+} & IsContractDeclarationMissing<
+  Partial<UseReadContractParameters>,
   {
     functionName: TFunctionName;
-  } & UseScaffoldArgsParam<TContractName, ReadAbiStateMutability, TFunctionName> &
-    RestConfigParam<ReadAbiStateMutability>
+  } & UseScaffoldArgsParam<TContractName, TFunctionName> &
+    Omit<UseReadContractParameters, "chainId" | "abi" | "address" | "functionName" | "args">
 >;
 
-export type UseScaffoldWriteConfig<
+export type ScaffoldWriteContractVariables<
   TContractName extends ContractName,
   TFunctionName extends ExtractAbiFunctionNames<ContractAbi<TContractName>, WriteAbiStateMutability>,
-> = {
-  contractName: TContractName;
-  value?: string;
-  onBlockConfirmation?: (txnReceipt: TransactionReceipt) => void;
-  blockConfirmations?: number;
-} & IsContractsFileMissing<
-  Partial<UseContractWriteConfig<"recklesslyUnprepared">> & { args?: unknown[] },
+> = IsContractDeclarationMissing<
+  Partial<WriteContractParameters>,
   {
     functionName: TFunctionName;
-  } & UseScaffoldArgsParam<TContractName, WriteAbiStateMutability, TFunctionName> &
-    RestConfigParam<WriteAbiStateMutability>
+  } & UseScaffoldArgsParam<TContractName, TFunctionName> &
+    Omit<WriteContractParameters, "chainId" | "abi" | "address" | "functionName" | "args">
 >;
+
+type WriteVariables = WriteContractVariables<Abi, string, any[], Config, number>;
+
+export type TransactorFuncOptions = {
+  onBlockConfirmation?: (txnReceipt: TransactionReceipt) => void;
+  blockConfirmations?: number;
+};
+
+export type ScaffoldWriteContractOptions = MutateOptions<
+  WriteContractReturnType,
+  WriteContractErrorType,
+  WriteVariables,
+  unknown
+> &
+  TransactorFuncOptions;
 
 export type UseScaffoldEventConfig<
   TContractName extends ContractName,
   TEventName extends ExtractAbiEventNames<ContractAbi<TContractName>>,
-  TEventInputs extends AbiEventArgs<ContractAbi<TContractName>, TEventName> & any[],
+  TEvent extends ExtractAbiEvent<ContractAbi<TContractName>, TEventName> = ExtractAbiEvent<
+    ContractAbi<TContractName>,
+    TEventName
+  >,
 > = {
   contractName: TContractName;
-} & IsContractsFileMissing<
-  UseContractEventConfig,
-  {
-    eventName: TEventName;
-    listener: (...args: TEventInputs) => void;
-    once?: boolean;
+  eventName: TEventName;
+} & IsContractDeclarationMissing<
+  Omit<UseWatchContractEventParameters, "onLogs" | "address" | "abi" | "eventName"> & {
+    onLogs: (
+      logs: Simplify<
+        Omit<Log<bigint, number, any>, "args" | "eventName"> & {
+          args: Record<string, unknown>;
+          eventName: string;
+        }
+      >[],
+    ) => void;
+  },
+  Omit<UseWatchContractEventParameters<ContractAbi<TContractName>>, "onLogs" | "address" | "abi" | "eventName"> & {
+    onLogs: (
+      logs: Simplify<
+        Omit<Log<bigint, number, false, TEvent, false, [TEvent], TEventName>, "args"> & {
+          args: AbiParametersToPrimitiveTypes<TEvent["inputs"]> &
+            GetEventArgs<
+              ContractAbi<TContractName>,
+              TEventName,
+              {
+                IndexedOnly: false;
+              }
+            >;
+        }
+      >[],
+    ) => void;
   }
 >;
 
@@ -187,12 +252,12 @@ type IndexedEventInputs<
 export type EventFilters<
   TContractName extends ContractName,
   TEventName extends ExtractAbiEventNames<ContractAbi<TContractName>>,
-> = IsContractsFileMissing<
+> = IsContractDeclarationMissing<
   any,
   IndexedEventInputs<TContractName, TEventName> extends never
     ? never
     : {
-        [Key in IsContractsFileMissing<
+        [Key in IsContractDeclarationMissing<
           any,
           IndexedEventInputs<TContractName, TEventName>["name"]
         >]?: AbiParameterToPrimitiveType<Extract<IndexedEventInputs<TContractName, TEventName>, { name: Key }>>;
@@ -202,12 +267,49 @@ export type EventFilters<
 export type UseScaffoldEventHistoryConfig<
   TContractName extends ContractName,
   TEventName extends ExtractAbiEventNames<ContractAbi<TContractName>>,
+  TBlockData extends boolean = false,
+  TTransactionData extends boolean = false,
+  TReceiptData extends boolean = false,
 > = {
   contractName: TContractName;
-  eventName: IsContractsFileMissing<string, TEventName>;
-  fromBlock: number;
+  eventName: IsContractDeclarationMissing<string, TEventName>;
+  fromBlock: bigint;
   filters?: EventFilters<TContractName, TEventName>;
-  blockData?: boolean;
-  transactionData?: boolean;
-  receiptData?: boolean;
+  blockData?: TBlockData;
+  transactionData?: TTransactionData;
+  receiptData?: TReceiptData;
+  watch?: boolean;
+  enabled?: boolean;
 };
+
+export type UseScaffoldEventHistoryData<
+  TContractName extends ContractName,
+  TEventName extends ExtractAbiEventNames<ContractAbi<TContractName>>,
+  TBlockData extends boolean = false,
+  TTransactionData extends boolean = false,
+  TReceiptData extends boolean = false,
+  TEvent extends ExtractAbiEvent<ContractAbi<TContractName>, TEventName> = ExtractAbiEvent<
+    ContractAbi<TContractName>,
+    TEventName
+  >,
+> =
+  | IsContractDeclarationMissing<
+      any[],
+      {
+        log: Log<bigint, number, false, TEvent, false, [TEvent], TEventName>;
+        args: AbiParametersToPrimitiveTypes<TEvent["inputs"]> &
+          GetEventArgs<
+            ContractAbi<TContractName>,
+            TEventName,
+            {
+              IndexedOnly: false;
+            }
+          >;
+        block: TBlockData extends true ? Block<bigint, true> : null;
+        receipt: TReceiptData extends true ? GetTransactionReturnType : null;
+        transaction: TTransactionData extends true ? GetTransactionReceiptReturnType : null;
+      }[]
+    >
+  | undefined;
+
+export type AbiParameterTuple = Extract<AbiParameter, { type: "tuple" | `tuple[${string}]` }>;

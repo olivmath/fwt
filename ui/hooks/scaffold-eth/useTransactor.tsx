@@ -1,18 +1,15 @@
-import { TransactionReceipt, TransactionRequest, TransactionResponse } from "@ethersproject/abstract-provider";
-import { SendTransactionResult } from "@wagmi/core";
-import { Signer, ethers } from "ethers";
-import { Deferrable } from "ethers/lib/utils";
-import { useSigner } from "wagmi";
-import deployedContracts from "~~/generated/deployedContracts";
-import { getBlockExplorerTxLink, notification } from "~~/utils/scaffold-eth";
+import { getPublicClient } from "@wagmi/core";
+import { Hash, SendTransactionParameters, TransactionReceipt, WalletClient } from "viem";
+import { Config, useWalletClient } from "wagmi";
+import { SendTransactionMutate } from "wagmi/query";
+import { wagmiConfig } from "~~/services/web3/wagmiConfig";
+import { getBlockExplorerTxLink, getParsedError, notification } from "~~/utils/scaffold-eth";
+import { TransactorFuncOptions } from "~~/utils/scaffold-eth/contract";
 
-type TTransactionFunc = (
-  tx: Promise<SendTransactionResult> | Deferrable<TransactionRequest> | undefined,
-  options?: {
-    onBlockConfirmation?: (txnReceipt: TransactionReceipt) => void;
-    blockConfirmations?: number;
-  },
-) => Promise<Record<string, any> | undefined>;
+type TransactionFunc = (
+  tx: (() => Promise<Hash>) | Parameters<SendTransactionMutate<Config, undefined>>[0],
+  options?: TransactorFuncOptions,
+) => Promise<Hash | undefined>;
 
 /**
  * Custom notification content for TXs.
@@ -22,7 +19,7 @@ const TxnNotification = ({ message, blockExplorerLink }: { message: string; bloc
     <div className={`flex flex-col ml-1 cursor-default`}>
       <p className="my-0">{message}</p>
       {blockExplorerLink && blockExplorerLink.length > 0 ? (
-        <a href={blockExplorerLink} target="_blank" rel="noreferrer" className="block underline text-md">
+        <a href={blockExplorerLink} target="_blank" rel="noreferrer" className="block link text-md">
           check out transaction
         </a>
       ) : null}
@@ -31,49 +28,60 @@ const TxnNotification = ({ message, blockExplorerLink }: { message: string; bloc
 };
 
 /**
- * Runs TXs showing UI feedback.
- * @param _signer
- * @dev If signer is provided => dev wants to send a raw tx.
+ * Runs Transaction passed in to returned function showing UI feedback.
+ * @param _walletClient - Optional wallet client to use. If not provided, will use the one from useWalletClient.
+ * @returns function that takes in transaction function as callback, shows UI feedback for transaction and returns a promise of the transaction hash
  */
-export const useTransactor = (_signer?: Signer): TTransactionFunc => {
-  let signer = _signer;
-  const { data } = useSigner();
-  if (signer === undefined && data) {
-    signer = data;
+export const useTransactor = (_walletClient?: WalletClient): TransactionFunc => {
+  let walletClient = _walletClient;
+  const { data } = useWalletClient();
+  if (walletClient === undefined && data) {
+    walletClient = data;
   }
 
-  const result: TTransactionFunc = async (tx, options) => {
-    if (!signer) {
-      notification.error("Wallet/Signer not connected");
+  const result: TransactionFunc = async (tx, options) => {
+    if (!walletClient) {
+      notification.error("Cannot access account");
       console.error("⚡️ ~ file: useTransactor.tsx ~ error");
       return;
     }
 
     let notificationId = null;
-    let transactionResponse: SendTransactionResult | TransactionResponse | undefined;
+    let transactionHash: Hash | undefined = undefined;
+    let transactionReceipt: TransactionReceipt | undefined;
+    let blockExplorerTxURL = "";
     try {
-      const provider = signer.provider;
-      const network = await provider?.getNetwork();
+      const network = await walletClient.getChainId();
+      // Get full transaction from public client
+      const publicClient = getPublicClient(wagmiConfig);
 
       notificationId = notification.loading(<TxnNotification message="Awaiting for user confirmation" />);
-      if (tx instanceof Promise) {
+      if (typeof tx === "function") {
         // Tx is already prepared by the caller
-        transactionResponse = await tx;
+        const result = await tx();
+        transactionHash = result;
       } else if (tx != null) {
-        transactionResponse = await signer.sendTransaction(tx);
+        transactionHash = await walletClient.sendTransaction(tx as SendTransactionParameters);
       } else {
         throw new Error("Incorrect transaction passed to transactor");
       }
       notification.remove(notificationId);
 
-      const blockExplorerTxURL = network ? getBlockExplorerTxLink(network, transactionResponse.hash) : "";
+      blockExplorerTxURL = network ? getBlockExplorerTxLink(network, transactionHash) : "";
 
       notificationId = notification.loading(
         <TxnNotification message="Waiting for transaction to complete." blockExplorerLink={blockExplorerTxURL} />,
       );
 
-      const transactionReceipt = await transactionResponse.wait(options?.blockConfirmations);
+      transactionReceipt = await publicClient.waitForTransactionReceipt({
+        hash: transactionHash,
+        confirmations: options?.blockConfirmations,
+      });
       notification.remove(notificationId);
+
+      if (transactionReceipt?.status === "reverted") {
+        throw new Error("Transaction reverted");
+      }
 
       notification.success(
         <TxnNotification message="Transaction completed successfully!" blockExplorerLink={blockExplorerTxURL} />,
@@ -87,56 +95,21 @@ export const useTransactor = (_signer?: Signer): TTransactionFunc => {
       if (notificationId) {
         notification.remove(notificationId);
       }
-      // TODO handle error properly
 
-      let errorData;
-      try {
-        errorData = JSON.parse(error.error.body).error.data;
-      } catch {
-        console.error("JSON.parse(error.error.body).error.data");
-        try {
-          errorData = error.error.data.data;
-        } catch {
-          console.error("error.error.data.data");
-        }
-      }
-
-      const errorMsg = (iface: ethers.utils.Interface, data: string) => {
-        const err = iface.parseError(data);
-        const errorName = err.name;
-        let errorArgs = "";
-        err.errorFragment.inputs.map((i, index) => {
-          if (i.type.startsWith("uint")) {
-            errorArgs += `${i.type} ${i.name}: ${parseInt(err.args[index])}, `;
-          } else {
-            errorArgs += `${i.type} ${i.name}: ${err.args[index]}, `;
-          }
-        });
-        console.error(errorArgs);
-        const message = `${errorName}(${errorArgs.slice(0, -2)})`;
-        console.error(message);
-        return message;
-      };
-
-      const contracts = deployedContracts[31337][0].contracts;
-      for (let contract of Object.values(contracts)) {
-        const abi = contract.abi.filter((item: any) => item.type === "error");
-        if (abi.length > 0) {
-          try {
-            const iface = new ethers.utils.Interface(abi);
-            const message = errorMsg(iface, errorData);
-            console.error(message);
-            notification.error(message);
-            break;
-          } catch (e) {
-            console.error("Contract error not mapping", e);
-          }
-        }
-      }
       console.error("⚡️ ~ file: useTransactor.ts ~ error", error);
+      const message = getParsedError(error);
+
+      // if receipt was reverted, show notification with block explorer link and return error
+      if (transactionReceipt?.status === "reverted") {
+        notification.error(<TxnNotification message={message} blockExplorerLink={blockExplorerTxURL} />);
+        throw error;
+      }
+
+      notification.error(message);
+      throw error;
     }
 
-    return transactionResponse;
+    return transactionHash;
   };
 
   return result;

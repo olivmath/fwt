@@ -1,30 +1,54 @@
-import { Abi } from "abitype";
-import { ethers } from "ethers";
-import { useContract, useProvider } from "wagmi";
+import { useTargetNetwork } from "./useTargetNetwork";
+import { Account, Address, Chain, Client, Transport, getContract } from "viem";
+import { usePublicClient } from "wagmi";
+import { GetWalletClientReturnType } from "wagmi/actions";
 import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
-import { ContractName } from "~~/utils/scaffold-eth/contract";
+import { Contract, ContractName } from "~~/utils/scaffold-eth/contract";
 
 /**
- * Gets a deployed contract by contract name and returns a contract instance
- * @param config - The config settings
- * @param config.contractName - Deployed contract name
- * @param config.signerOrProvider - An ethers Provider or Signer (optional)
+ * Gets a viem instance of the contract present in deployedContracts.ts or externalContracts.ts corresponding to
+ * targetNetworks configured in scaffold.config.ts. Optional walletClient can be passed for doing write transactions.
+ * @param config - The config settings for the hook
+ * @param config.contractName - deployed contract name
+ * @param config.walletClient - optional walletClient from wagmi useWalletClient hook can be passed for doing write transactions
  */
-export const useScaffoldContract = <TContractName extends ContractName>({
+export const useScaffoldContract = <
+  TContractName extends ContractName,
+  TWalletClient extends Exclude<GetWalletClientReturnType, null> | undefined,
+>({
   contractName,
-  signerOrProvider,
+  walletClient,
 }: {
   contractName: TContractName;
-  signerOrProvider?: ethers.Signer | ethers.providers.Provider;
+  walletClient?: TWalletClient | null;
 }) => {
   const { data: deployedContractData, isLoading: deployedContractLoading } = useDeployedContractInfo(contractName);
-  const provider = useProvider();
+  const { targetNetwork } = useTargetNetwork();
+  const publicClient = usePublicClient({ chainId: targetNetwork.id });
 
-  const contract = useContract({
-    address: deployedContractData?.address,
-    abi: deployedContractData?.abi as Abi,
-    signerOrProvider: signerOrProvider === undefined ? provider : signerOrProvider,
-  });
+  let contract = undefined;
+  if (deployedContractData && publicClient) {
+    contract = getContract<
+      Transport,
+      Address,
+      Contract<TContractName>["abi"],
+      TWalletClient extends Exclude<GetWalletClientReturnType, null>
+        ? {
+            public: Client<Transport, Chain>;
+            wallet: TWalletClient;
+          }
+        : { public: Client<Transport, Chain> },
+      Chain,
+      Account
+    >({
+      address: deployedContractData.address,
+      abi: deployedContractData.abi as Contract<TContractName>["abi"],
+      client: {
+        public: publicClient,
+        wallet: walletClient ? walletClient : undefined,
+      } as any,
+    });
+  }
 
   return {
     data: contract,
