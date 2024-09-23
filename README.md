@@ -1,4 +1,4 @@
-# Fullstack Web3 Template v2.3.1
+# Fullstack Web3 Template v2.3.2
 
 ## QuickStart
 
@@ -33,7 +33,7 @@ anvil -b 1 # Mining blocks every 1 second
 
 ```bash
 cd smartcontracts
-./deploy.local.sh
+./deploy-on-local.sh
 ```
 
 ## FWT Structure
