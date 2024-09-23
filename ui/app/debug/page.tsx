@@ -1,13 +1,26 @@
+"use client";
+
 import { DebugContracts } from "./_components/DebugContracts";
 import type { NextPage } from "next";
-import { getMetadata } from "~~/utils/fwt/getMetadata";
-
-export const metadata = getMetadata({
-  title: "Debug Contracts",
-  description: "Debug your deployed 🏗 Fullstack Web3 Template contracts in an easy way",
-});
+import { useScaffoldWatchContractEvent } from "~~/hooks/scaffold-eth/useScaffoldWatchContractEvent";
+import { notification } from "~~/utils/fwt/notification";
 
 const Debug: NextPage = () => {
+  useScaffoldWatchContractEvent({
+    contractName: "Counter",
+    eventName: "YouCall",
+    onLogs: logs => {
+      logs.forEach(log => {
+        notification.info(
+          `Event YouCall triggered:
+          Caller: ${log.args.caller}
+          Amount: ${log.args.amount} wei`,
+          { duration: 6000 }
+        );
+      });
+    },
+  });
+
   return (
     <>
       <DebugContracts />
